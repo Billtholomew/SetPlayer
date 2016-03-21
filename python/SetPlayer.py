@@ -77,6 +77,7 @@ def normalize_preprocess(tDims):
   return pts,barys,idxs
 
 def parse_image(cardImage):
+  cardImage = cv2.GaussianBlur(cardImage,(5,5),0)
   # get mask for just shape
   cardImageBW = cv2.cvtColor(cardImage,cv2.COLOR_RGB2GRAY)
   _,cardImageMask = cv2.threshold(cardImageBW,np.mean(cardImage)-np.std(cardImage),255,cv2.THRESH_BINARY_INV)
@@ -89,21 +90,12 @@ def parse_image(cardImage):
   sAreas = sAreas[sAreas>(tDims[0]*tDims[1])/20]
   count = len(contours)
   shape = contours[np.argmax(sAreas)]
-
-  #epsilons = [0.001*cv2.arcLength(shape,True) for shape in contours]
-  #contours = [cv2.approxPolyDP(shape,epsilon,True) for shape,epsilon in zip(contours,epsilons)]
-
-  count = len(contours)
-  shape = contours[np.argmax(sAreas)]
-  
   # infill
   shapeArea = sum(cv2.contourArea(shape) for shape in contours)
   infill = (np.sum(cardImageMask)/255.0)/shapeArea
   # average color
   bounds = np.zeros(cardImageMask.shape,dtype='uint8')
   cv2.drawContours(bounds,contours,-1,[255])
-  bounds = cv2.dilate(bounds,np.array([[1,1,1],[1,1,1],[1,1,1]]))
-  bounds[np.equal(bounds,cardImageMask)] = 255
   #bounds[np.not_equal(ima,imb)] = 0
   color = np.uint8([[cv2.mean(cardImage,bounds)]])
   #print color
@@ -112,6 +104,29 @@ def parse_image(cardImage):
   # the scale is supposed to be ([0,100],[-128,128],[-128,128])
   #color = np.subtract(np.multiply(np.divide(color,[255.0,1.,1.0]),[100,1,1]),[0,128,128])
   return {'shape':shape,'infill':infill,'color':color,'count':count}
+
+def get_card_data(normData,oim):
+  pts,barys,idxs = normData
+  cards = {}
+  zeroImage = np.zeros(tDims,np.uint8)
+  for cid,rect in enumerate(rects):
+    cardImage = zeroImage.copy()
+    # target (rectangle) x,y
+    rpts = rect[idxs,:]
+    nrs = pts[:,0]
+    ncs = pts[:,1]
+    # source (original) x,y
+    ors = np.multiply(rpts[:,:,0],barys).sum(axis=1,keepdims=True).astype("int32")
+    ocs = np.multiply(rpts[:,:,1],barys).sum(axis=1,keepdims=True).astype("int32")
+
+    cardImage[nrs,ncs,:] = oim[ors,ocs,:].reshape((-1,3))
+
+    cardInfo = parse_image(cardImage)
+    border = np.fliplr(rect).reshape((-1,1,2))
+    cardInfo['loc'] = [border]
+    cards[cid] = cardInfo
+    print cid
+  return cards
 
 def set_check(cardA,cardB,cardC,debug=False):
   def infill_check(cardA,cardB):
@@ -152,61 +167,32 @@ def set_check(cardA,cardB,cardC,debug=False):
     return False
   return True
 
+def find_all_sets(cards,oim):
+  for c in combinations(cards.keys(),3):
+    cardA = cards[c[0]]
+    cardB = cards[c[1]]
+    cardC = cards[c[2]]
+    if set_check(cardA,cardB,cardC,debug=False):
+      print "SET FOUND!"
+      nim = oim.copy()
+      cv2.drawContours(nim,cardA['loc'],-1,(0,255,0),3)
+      cv2.drawContours(nim,cardB['loc'],-1,(0,255,0),3)
+      cv2.drawContours(nim,cardC['loc'],-1,(0,255,0),3)
+      cv2.imshow("SET",nim)
+      cv2.waitKey(0)
+
 fName = "../data/angled.jpg"
 oim = cv2.imread(fName)
 oim = resize(oim)
 im = cv2.cvtColor(oim,cv2.COLOR_RGB2GRAY)
 im = threshold_image(im)
 contours, hierarchy = cv2.findContours(im,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-print len(contours)
 locs = [shape for shape in contours if cv2.contourArea(shape)>(im.shape[0]*im.shape[1])/15/1000*1000/3]
 rects = rectify(locs)
 
 tDims = (int(270/1.5),int(420/1.5),3)
-
-pts,barys,idxs = normalize_preprocess(tDims)
-
-# 1, 3, 9
-
-cards = {}
-
-for cid,rect in enumerate(rects):
-  cardImage = np.zeros(tDims,np.uint8)
-  # target (rectangle) x,y
-  rpts = rect[idxs,:]
-  # source (original) x,y
-  oys = np.multiply(rpts[:,:,0],barys).sum(axis=1,keepdims=True).astype("int32")
-  oxs = np.multiply(rpts[:,:,1],barys).sum(axis=1,keepdims=True).astype("int32")
-  for i in xrange(pts.shape[0]):
-    y = oys[i]
-    x = oxs[i]
-    cardImage[pts[i,0],pts[i,1]] = oim[y,x]
-  cardImage = cv2.GaussianBlur(cardImage,(5,5),0)
-  cardInfo = parse_image(cardImage)
-  border = np.fliplr(rect).reshape((-1,1,2))
-  cardInfo['loc'] = [border]
-  cards[cid] = cardInfo
-  cardImage = cv2.resize(cardImage,dsize=(0,0),fx=2.0,fy=2.0)
-  print cid
-  # 
-  #cv2.imshow("image",cardImage)
-  #cv2.waitKey(0)
-
-for c in combinations(cards.keys(),3):
-  if (c[0] in [1,3,9]) and (c[1] in [1,3,9]) and (c[2] in [1,3,9]):
-    debug = True
-  else:
-    debug = False
-  cardA = cards[c[0]]
-  cardB = cards[c[1]]
-  cardC = cards[c[2]]
-  if set_check(cardA,cardB,cardC,debug):
-    print "SET FOUND!"
-    nim = oim.copy()
-    cv2.drawContours(nim,cardA['loc'],-1,(0,255,0),3)
-    cv2.drawContours(nim,cardB['loc'],-1,(0,255,0),3)
-    cv2.drawContours(nim,cardC['loc'],-1,(0,255,0),3)
-    cv2.imshow("SET",nim)
-    cv2.waitKey(0)
+normData = normalize_preprocess(tDims)
+cards = get_card_data(normData,oim)
+find_all_sets(cards,oim)
 
 cv2.destroyAllWindows()
