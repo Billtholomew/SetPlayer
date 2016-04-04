@@ -2,13 +2,7 @@ import numpy as np
 from scipy.spatial import Delaunay
 from scipy import stats
 from itertools import combinations
-import matplotlib as plt
 import cv2
-
-def resize(im,maxSize=512):
-  dims = im.shape
-  scale = float(512)/max(dims)
-  return cv2.resize(im,(0,0),fx=scale,fy=scale)
 
 def imclose(im,n=5):
   im = cv2.dilate(im,np.ones((n,n),np.uint8),iterations=1)
@@ -33,16 +27,16 @@ def find_card_color(im):
   cardStd = min(32,cardStd)
   return cardColor,cardStd
 
-def threshold_image(im):
-  cardColor,cardStd = find_card_color(im)
-  _,ima = cv2.threshold(im,cardColor-cardStd,255,cv2.THRESH_BINARY)
-  _,imb = cv2.threshold(im,cardColor+cardStd,255,cv2.THRESH_BINARY_INV)
-  im[np.equal(ima,imb)] = 255
-  im[np.not_equal(ima,imb)] = 0
-  im = imopen(im)
-  im = imopen(im)
-  return im
-
+def threshold_image(im,colorMu,colorStd):
+  nim = im.copy()
+  _,ima = cv2.threshold(im,colorMu-colorStd,255,cv2.THRESH_BINARY)
+  _,imb = cv2.threshold(im,colorMu+colorStd,255,cv2.THRESH_BINARY_INV)
+  nim[np.equal(ima,imb)] = 255
+  nim[np.not_equal(ima,imb)] = 0
+  nim = imopen(nim)
+  nim = imopen(nim)
+  return nim
+  
 def rectify(contour):
   def worker(contour):
     contour = np.reshape(contour,(len(contour),2))
@@ -77,44 +71,65 @@ def normalize_preprocess(tDims):
   return pts,barys,idxs
 
 def parse_image(cardImage):
-  cardImage = cv2.GaussianBlur(cardImage,(5,5),0)
+
+  shape = None
+  infill = None
+  color = None
+  count = None
+  
   # get mask for just shape
   cardImageBW = cv2.cvtColor(cardImage,cv2.COLOR_RGB2GRAY)
-  _,cardImageMask = cv2.threshold(cardImageBW,np.mean(cardImage)-np.std(cardImage),255,cv2.THRESH_BINARY_INV)
-  #cardColor = cv2.mean(cardImage,cardImageMask-255)
+  _,cardImageMask = cv2.threshold(cardImageBW,np.mean(cardImageBW)-np.std(cardImageBW),1,cv2.THRESH_BINARY_INV)
+  cardColor,cardStd = cv2.meanStdDev(cardImageBW)
+  cardImageMask = (255-threshold_image(cardImageBW,cardColor,cardStd).astype("uint8"))
   # count & shape
-  contours,_ = cv2.findContours(cardImageMask.copy(),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+  contours,_ = cv2.findContours(cardImageMask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
   contours = np.array(contours)
   sAreas = np.array([cv2.contourArea(shape) for shape in contours])
   contours = contours[sAreas>(tDims[0]*tDims[1])/20]
   sAreas = sAreas[sAreas>(tDims[0]*tDims[1])/20]
   count = len(contours)
   shape = contours[np.argmax(sAreas)]
-  # infill
-  shapeArea = sum(cv2.contourArea(shape) for shape in contours)
-  infill = (np.sum(cardImageMask)/255.0)/shapeArea
-  # average color
-  bounds = np.zeros(cardImageMask.shape,dtype='uint8')
-  cv2.drawContours(bounds,contours,-1,[255])
-  #bounds[np.not_equal(ima,imb)] = 0
-  color = np.uint8([[cv2.mean(cardImage,bounds)]])
-  #print color
-  # convert to cieLAB
-  #color = np.squeeze(cv2.cvtColor(color,cv2.COLOR_RGB2LAB))
-  # the scale is supposed to be ([0,100],[-128,128],[-128,128])
-  #color = np.subtract(np.multiply(np.divide(color,[255.0,1.,1.0]),[100,1,1]),[0,128,128])
+  # color and infill
+  cardImageMask = np.zeros(cardImageMask.shape)
+  cv2.drawContours(cardImageMask,contours,-1,(255,0,0),-1)
+  shapeShade = np.multiply(cardImageMask/255.0,cardImageBW)  
+
+  color = cv2.mean(cardImage,(cardImageMask/255.0).astype("uint8"))
+  color = cv2.cvtColor(np.uint8([[color]]),cv2.COLOR_RGB2HSV)
+  color = color[0][0]
+  color2 = color.copy()
+  color[1] = 255
+  color[2] = 255
+
+  cardImage = cv2.GaussianBlur(cardImage,(15,15),0)
+  
+  cardMask = (1-cv2.dilate(cardImageMask,np.ones((10,10),np.uint8),iterations=1)/255.0).astype("uint8")
+  cColor = cv2.mean(cardImage,cardMask)
+  infillMask = (cv2.erode(cardImageMask,np.ones((20,20),np.uint8),iterations=1)/255.0).astype("uint8")
+
+  sColor = cv2.mean(cardImage,infillMask)
+  sColor2 = cv2.cvtColor(np.uint8([[color2]]),cv2.COLOR_HSV2RGB)[0][0]
+
+  dA = np.absolute(np.subtract(np.int16([sColor[:3]]),np.int16([cColor[:3]])))
+  dB = np.absolute(np.subtract(np.int16([sColor2[:3]]),np.int16([cColor[:3]])))
+  infill = np.max(np.divide(dA.astype("float"),dB.astype("float")))
+  
   return {'shape':shape,'infill':infill,'color':color,'count':count}
 
-def get_card_data(normData,oim):
+def get_card_features(normData,oim):
   pts,barys,idxs = normData
   cards = {}
   zeroImage = np.zeros(tDims,np.uint8)
+
+  nrs = pts[:,0]
+  ncs = pts[:,1]
+  
   for cid,rect in enumerate(rects):
+
     cardImage = zeroImage.copy()
     # target (rectangle) x,y
     rpts = rect[idxs,:]
-    nrs = pts[:,0]
-    ncs = pts[:,1]
     # source (original) x,y
     ors = np.multiply(rpts[:,:,0],barys).sum(axis=1,keepdims=True).astype("int32")
     ocs = np.multiply(rpts[:,:,1],barys).sum(axis=1,keepdims=True).astype("int32")
@@ -126,11 +141,15 @@ def get_card_data(normData,oim):
     cardInfo['loc'] = [border]
     cards[cid] = cardInfo
     print cid
+  
   return cards
 
 def set_check(cardA,cardB,cardC,debug=False):
+  def color_check(cardA,cardB):
+    print cardA['color'],cardB['color'],(np.sum(np.subtract(cardA['color'].astype("float"),cardB['color'].astype("float"))**2)**0.5)
+    return (np.sum(np.subtract(cardA['color'].astype("float"),cardB['color'].astype("float"))**2)**0.5)<50
   def infill_check(cardA,cardB):
-    return abs(cardA['infill']-cardB['infill'])<0.1
+    return abs(cardA['infill']-cardB['infill'])<0.15
   def shape_check(cardA,cardB):
     return cv2.matchShapes(cardA['shape'],cardB['shape'],1,0.0)<0.05
   def count_check(cardA,cardB):
@@ -157,13 +176,9 @@ def set_check(cardA,cardB,cardC,debug=False):
     if debug:
        print 'shape not set'
     return False
-  # color needs a special checker
-  #print cardA['color'],cardB['color'],cardC['color']
-  dAB = np.sum(np.subtract(cardA['color'],cardB['color'])**2)**0.5
-  dAC = np.sum(np.subtract(cardA['color'],cardC['color'])**2)**0.5
-  dBC = np.sum(np.subtract(cardB['color'],cardC['color'])**2)**0.5
-  print dAB,dAC,dBC
-  if not ( (dAB>50 and dAC>50 and dBC>50) or (dAB<50 and dAC<50 and dBC<50) ):
+  if not tri_check(cardA,cardB,cardC,color_check):
+    if debug:
+      print 'Color not set'
     return False
   return True
 
@@ -174,6 +189,9 @@ def find_all_sets(cards,oim):
     cardC = cards[c[2]]
     if set_check(cardA,cardB,cardC,debug=False):
       print "SET FOUND!"
+      print cardA['color'],cardA['infill'],cardA['count']
+      print cardB['color'],cardB['infill'],cardB['count']
+      print cardC['color'],cardC['infill'],cardC['count']
       nim = oim.copy()
       cv2.drawContours(nim,cardA['loc'],-1,(0,255,0),3)
       cv2.drawContours(nim,cardB['loc'],-1,(0,255,0),3)
@@ -183,16 +201,16 @@ def find_all_sets(cards,oim):
 
 fName = "../data/angled.jpg"
 oim = cv2.imread(fName)
-oim = resize(oim)
 im = cv2.cvtColor(oim,cv2.COLOR_RGB2GRAY)
-im = threshold_image(im)
+colorMu,colorStd = find_card_color(im)
+im = threshold_image(im,colorMu,colorStd)
 contours, hierarchy = cv2.findContours(im,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
 locs = [shape for shape in contours if cv2.contourArea(shape)>(im.shape[0]*im.shape[1])/15/1000*1000/3]
 rects = rectify(locs)
 
-tDims = (int(270/1.5),int(420/1.5),3)
+tDims = (int(270),int(420),3)
 normData = normalize_preprocess(tDims)
-cards = get_card_data(normData,oim)
+cards = get_card_features(normData,oim)
 find_all_sets(cards,oim)
 
 cv2.destroyAllWindows()
