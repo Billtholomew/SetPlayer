@@ -5,6 +5,10 @@ Takes no input through command line, instead it is hardcoded.
 Usage is as
 fName = "../data/setTest.jpg"
 
+Image used for testing can be acquired here:
+http://www.theboardgamefamily.com/wp-content/uploads/2013/03/SetCards.jpg
+
+
 Parses most images tested correctly. 
 Works best with images with less specular reflection, and greater difference between card color and table sruface.
 
