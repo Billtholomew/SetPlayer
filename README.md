@@ -1,6 +1,10 @@
 # SetPlayer
 This finds set of three cards in the game Set
 
+Takes no input through command line, instead it is hardcoded.
+Usage is as
+fName = "../data/setTest.jpg"
+
 Parses most images tested correctly. 
 Works best with images with less specular reflection, and greater difference between card color and table sruface.
 
