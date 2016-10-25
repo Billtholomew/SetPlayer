@@ -36,7 +36,9 @@ def threshold_image(im,colorMu,colorStd):
   nim = imopen(nim)
   nim = imopen(nim)
   return nim
-  
+
+# standardize points to make it a more reliable rectangle to work with
+# actually probably more of a trapezoid than a rectangle
 def rectify(contour):
   def worker(contour):
     contour = np.reshape(contour,(len(contour),2))
@@ -152,62 +154,25 @@ def get_card_features(normData,oim):
   
   return cards
 
-def set_check(cardA,cardB,cardC,debug=False):
-  def color_check(cardA,cardB):
-    if np.size(np.intersect1d(np.where(cardA['color']==255)[0],np.where(cardB['color']==255)[0]))==0:
-      return False
-    return True
-  def infill_check(cardA,cardB):
-    return abs(cardA['infill']-cardB['infill'])<1
-  def shape_check(cardA,cardB):
-    return cv2.matchShapes(cardA['shape'],cardB['shape'],1,0.0)<0.05
-  def count_check(cardA,cardB):
-    return cardA['count']==cardB['count']
-  def tri_check(cardA,cardB,cardC,func):
-    AB = func(cardA,cardB)
-    AC = func(cardA,cardC)
-    BC = func(cardB,cardC)
-    if (AB and BC):
-      return True
-    if not AB and not BC and not AC:
-      return True
-    return False
-  # actual body
-  if not tri_check(cardA,cardB,cardC,count_check):
-    if debug:
-      print 'Count not set'
-    return False
-  if not tri_check(cardA,cardB,cardC,infill_check):
-    if debug:
-       print 'infill not set'
-    return False
-  if not tri_check(cardA,cardB,cardC,shape_check):
-    if debug:
-       print 'shape not set'
-    return False
-  if not tri_check(cardA,cardB,cardC,color_check):
-    if debug:
-      print 'Color not set'
-    return False
-  return True
-
-def find_all_sets(cards,oim):
-  for c in combinations(cards.keys(),3):
-    cardA = cards[c[0]]
-    cardB = cards[c[1]]
-    cardC = cards[c[2]]
-    if set_check(cardA,cardB,cardC,debug=False):
-      print "SET FOUND!"
-      print cardA['color'],cardA['infill'],cardA['count']
-      print cardB['color'],cardB['infill'],cardB['count']
-      print cardC['color'],cardC['infill'],cardC['count']
-      nim = oim.copy()
-      c = (255,0,0)
-      cv2.drawContours(nim,cardA['loc'],-1,cardA['color'].tolist(),3)
-      cv2.drawContours(nim,cardB['loc'],-1,cardB['color'].tolist(),3)
-      cv2.drawContours(nim,cardC['loc'],-1,cardC['color'].tolist(),3)
-      cv2.imshow("SET",nim)
-      cv2.waitKey(0)
+# board is the group of cards that sets should be found in
+def find_all_sets(board,n=3):
+  # iterate through all combinations of n SET cards
+  # note that this only creates combinations of cids
+  for cids in combinations(board.keys(),n):
+    cards = [board[c] for c in cids]
+    # assume all cards will have the same attributes, so just pull from first card
+    attributes = cards[0].attributes.keys() 
+    validSet = True
+    for a in attributes:
+      # get the values for the current attribute for all cards
+      # there should be 1 unique value (all same) or n unique values (all different)
+      # if not, break early and set validSet to False
+      aVals = set(map(lambda x:x.attributes[a],cards))
+      if not (len(aVals)==1 or len(aVals)==n):
+        validSet = False
+        break
+    if validSet:
+      yield sorted(cids)
 
 fName = "../data/angled.jpg"
 oim = cv2.imread(fName)
@@ -221,6 +186,14 @@ rects = rectify(locs)
 tDims = (int(270),int(420),3)
 normData = normalize_preprocess(tDims)
 cards = get_card_features(normData,oim)
-find_all_sets(cards,oim)
+
+for cidSet in find_all_sets(cards,n=3):
+  nim = oim.copy()
+  c = (255,0,0)
+  for cid in cidSet:
+    card = cards[cid]
+    cv2.drawContours(nim,card.loc,-1,c,3)
+  cv2.imshow("SET",nim)
+  cv2.waitKey(0)
 
 cv2.destroyAllWindows()
