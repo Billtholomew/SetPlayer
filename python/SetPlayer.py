@@ -3,7 +3,7 @@ from itertools import combinations
 import cv2
 
 import image_processing as ip
-import Transformation
+import transformation
 from Card import Card
 from CardAttributes import Count, Color, Shape
 
@@ -29,7 +29,7 @@ def find_cards_in_image(im):
     _, contours, _ = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = [contour for contour in contours
                 if cv2.contourArea(contour) > (im.shape[0] * im.shape[1]) / 15 / 1000 * 1000 / 3]
-    trapezoids = map(Transformation.simple_trapezoid, contours)
+    trapezoids = map(transformation.simple_trapezoid, contours)
     return trapezoids
 
 
@@ -46,7 +46,7 @@ def parse_image(card_image, cid, source_vertices):
 
 
 def get_card_features(target_dimensions, im, card_borders):
-    transformer = Transformation.Transformer(target_image_dimensions=target_dimensions)
+    transformer = transformation.Transformer(target_image_dimensions=target_dimensions)
     cards = {}
     for cid, source_vertices in enumerate(card_borders):
         card_image = transformer.transform(im, source_vertices)
