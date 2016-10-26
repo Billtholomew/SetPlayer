@@ -22,10 +22,10 @@ def im_open(im, n=5):
     return im
 
 
-def threshold_image(im, colorMu, colorStd=0, sigma=1):
+def threshold_image(im, color_mu, color_std=0, sigma=1):
     nim = im.copy()
-    _, ima = cv2.threshold(im, colorMu - (colorStd * sigma), 255, cv2.THRESH_BINARY)
-    _, imb = cv2.threshold(im, colorMu + (colorStd * sigma), 255, cv2.THRESH_BINARY_INV)
+    _, ima = cv2.threshold(im, color_mu - (color_std * sigma), 255, cv2.THRESH_BINARY)
+    _, imb = cv2.threshold(im, color_mu + (color_std * sigma), 255, cv2.THRESH_BINARY_INV)
     nim[np.equal(ima,imb)] = 255
     nim[np.not_equal(ima,imb)] = 0
     nim = im_open(nim)
@@ -34,6 +34,6 @@ def threshold_image(im, colorMu, colorStd=0, sigma=1):
 
 
 def im_mask(im, sigma=1):
-    imGray = bgr2gray(im)
-    cardColor, cardStd = cv2.meanStdDev(imGray)
-    return threshold_image(imGray, cardColor, cardStd).astype("uint8")
+    im_gray = bgr2gray(im)
+    card_color_mu, card_color_std = cv2.meanStdDev(im_gray)
+    return threshold_image(im_gray, card_color_mu, card_color_std).astype("uint8")
