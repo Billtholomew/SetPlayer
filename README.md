@@ -1,6 +1,14 @@
 # SetPlayer
 This finds set of three cards in the game Set
 
+# Requirements
+
+- OpenCV v2.4.13
+- Numpy v1.8.0
+- Scipy v0.18.2
+
+# Running
+
 Takes no input through command line, instead it is hardcoded.
 Usage is as
 fName = "../data/setTest.jpg"
