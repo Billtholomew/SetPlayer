@@ -16,7 +16,7 @@ class AbstractAttribute:
 
     def find_contours(self, card_image):
         card_image_mask = (255 - ip.im_mask(card_image))
-        _, contours, _ = ip.cv2.findContours(card_image_mask, ip.cv2.RETR_EXTERNAL, ip.cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = ip.cv2.findContours(card_image_mask, ip.cv2.RETR_EXTERNAL, ip.cv2.CHAIN_APPROX_SIMPLE)
         card_area = card_image.shape[0] * card_image.shape[1]
         contours = [contour for contour in contours
                     if (card_area / 20) < ip.cv2.contourArea(contour)]

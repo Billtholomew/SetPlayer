@@ -27,7 +27,7 @@ def find_cards_in_image(im):
     im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
     color_mu, color_std = find_card_color(im)
     im = ip.threshold_image(im, color_mu, color_std)
-    _, contours, _ = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = [contour for contour in contours
                 if cv2.contourArea(contour) > (im.shape[0] * im.shape[1]) / 15 / 1000 * 1000 / 3]
     trapezoids = map(transformation.simple_trapezoid, contours)
@@ -83,14 +83,13 @@ def generate_valid_sets(board, n=3):
 def visualize_set(card_set, im):
     nim = im.copy()
     color = (255, 0, 0)
-    print '----------'
-    for card in card_set:
-        print card.attributes['shape'].data, card.attributes['shape'].classification
     cv2.drawContours(nim, map(lambda card: card.loc, card_set), -1, color, 3)
+    print map(lambda card: card.attributes['count'].data, card_set), map(lambda card: card.attributes['count'].classification, card_set)
     cv2.imshow("SET", nim)
     cv2.waitKey(0)
+    pass
 
-fName = "../data/SetCards.jpg"
+fName = "../data/setTest.jpg"
 oim = cv2.imread(fName)
 all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim)
 
