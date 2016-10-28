@@ -100,7 +100,7 @@ class Shape(AbstractAttribute):
             epsilon = 0.01*ip.cv2.arcLength(contour, True)
             simple_contour = ip.cv2.approxPolyDP(contour, epsilon, True)
             points.append(len(simple_contour))
-        self.data = map(int, [ip.np.mean(ap_ratio)**2, ip.np.mean(points)**2])
+        self.data = map(np.round, [ip.np.mean(ap_ratio) ** 0.5 * 10, ip.np.mean(points) ** 0.5 * 10])
 
 
 class Count(AbstractAttribute):
@@ -112,7 +112,7 @@ class Count(AbstractAttribute):
 
     def parse_image(self, card_image):
         self.find_contours(card_image)
-        self.data = len(self.contours)
+        self.data = (len(self.contours), len(self.contours) ** 2)
 
 
 class Color(AbstractAttribute):
@@ -129,5 +129,8 @@ class Color(AbstractAttribute):
         color = ip.cv2.mean(card_image, (card_image_mask / 255.0).astype("uint8"))
         color = ip.cv2.cvtColor(np.uint8([[color]]), ip.cv2.COLOR_BGR2HSV)
         color = color[0][0]
-        self.data = color[0].astype('float') / 180.0 * 360.0
+        theta = color[0] * 2  # H will be in [0, 180] convert to [0, 360]
+        theta *= (np.pi / 180)  # convert to radians
+        self.data = [np.cos(theta) / 2, np.sin(theta) / 2]  # reduce by 2 to make colors more likely to cluster
+
 

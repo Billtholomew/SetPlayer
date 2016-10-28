@@ -1,7 +1,6 @@
 import numpy as np
 import cv2
 
-
 def bgr2gray(im):
     return cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
 
@@ -37,3 +36,25 @@ def im_mask(im, sigma=1):
     im_gray = bgr2gray(im)
     card_color_mu, card_color_std = cv2.meanStdDev(im_gray)
     return threshold_image(im_gray, card_color_mu, card_color_std).astype("uint8")
+
+
+def im_read(fName, color='COLOR'):
+    if color == 'ANY_DEPTH':
+        color = cv2.CV_LOAD_IMAGE_ANYDEPTH
+    elif color == 'COLOR':
+        color = cv2.CV_LOAD_IMAGE_COLOR
+    elif color == 'GRAYSCALE':
+        color = cv2.CV_LOAD_IMAGE_GRAYSCALE
+    return cv2.imread(fName, color)
+
+
+def im_show(im, window_name='image', wait_time=0):
+    cv2.imshow(window_name, im)
+    cv2.waitKey(wait_time)
+
+
+def close_window(window_name=None, close_all_windows=False):
+    if close_all_windows:
+        cv2.destroyAllWindows()
+    else:
+        cv2.destroyWindow(window_name)

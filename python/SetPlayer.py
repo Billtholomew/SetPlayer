@@ -84,13 +84,13 @@ def visualize_set(card_set, im):
     nim = im.copy()
     color = (255, 0, 0)
     cv2.drawContours(nim, map(lambda card: card.loc, card_set), -1, color, 3)
-    print map(lambda card: card.attributes['count'].data, card_set), map(lambda card: card.attributes['count'].classification, card_set)
-    cv2.imshow("SET", nim)
-    cv2.waitKey(0)
+    print map(lambda card: card.attributes['count'].data, card_set), \
+        map(lambda card: card.attributes['count'].classification, card_set)
+    ip.im_show(nim, "SET", 0)
     pass
 
 fName = "../data/setTest.jpg"
-oim = cv2.imread(fName)
+oim = ip.im_read(fName)
 all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim)
 
 learning.classify_attributes(all_cards, ['shape', 'color', 'count', 'infill'])
@@ -99,4 +99,4 @@ for cid_set in generate_valid_sets(all_cards, n=3):
     card_set = map(lambda cid: all_cards[cid], cid_set)
     visualize_set(card_set, oim)
 
-cv2.destroyAllWindows()
+ip.close_window()

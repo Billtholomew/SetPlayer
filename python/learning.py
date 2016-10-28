@@ -12,26 +12,23 @@ def classify_attributes(all_cards, attributes_to_classify):
 
 
 def Wk(centroids, labels, data):
-    cluster_ids = set(labels.tolist())
-    clusters = {l:data[labels == l] for l in set(labels)}
-    s = 0
-    for i,c in clusters.iteritems():
-        s_t = linalg.norm(centroids[i] - c) ** 2 / (2 * len(c))
-        s += s_t
-    # sum([linalg.norm(centroids[i] - c) ** 2 / (2 * len(c)) for i in range(k) for c in clusters[i]])
-    pass
-    return s
+    clusters = {l: data[labels == l] for l in set(labels)}
+    return sum([linalg.norm(centroids[i] - c) ** 2 / (2 * len(c)) for i, c in clusters.iteritems()])
 
 
 # Pass in a list of a the data for a single attribute for all cards
 def learn_classes_kmeans(data):
     labels = []
     temp_labels = [0 for _ in data]
-    k = 1
+    k = 0
+    print '--------'
+    for d in data:
+        print d
     while k < len(data):
         k += 1
         labels = temp_labels
         centroids, temp_labels = kmeans2(data, k)
+        _, distortion = kmeans(whiten(data), k)
         wk = Wk(centroids, temp_labels, data)
-        print wk
+        print k, wk, distortion
     return labels
