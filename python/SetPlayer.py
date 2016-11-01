@@ -9,32 +9,18 @@ from Card import Card
 from CardAttributes import Count, Color, Shape, Infill
 
 
-def find_card_color(im):
-    bg = np.hstack((im[[0, -1], :].flatten(), im[:, [0, -1]].flatten()))
-    background_color_mu, background_color_std = np.mean(bg), np.std(bg)
-    histogram = np.histogram(im,bins=16)
-    card_color_mu = None
-    for count, value in zip(histogram[0], histogram[1]):
-        if count > (im.size/8) and not (abs(value - background_color_mu) < 32):
-            card_color_mu = value
-            break
-    card_color_stddev = max(32, abs(card_color_mu - background_color_mu) - background_color_std * 1.5)
-    card_color_stddev = min(32, card_color_stddev)
-    return card_color_mu, card_color_stddev
-
-
 def find_cards_in_image(im):
     im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-    color_mu, color_std = find_card_color(im)
-    im = ip.threshold_image(im, color_mu, color_std)
-    contours, _ = cv2.findContours(im, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    contours = [contour for contour in contours
-                if cv2.contourArea(contour) > (im.shape[0] * im.shape[1]) / 15 / 1000 * 1000 / 3]
-    trapezoids = map(transformation.simple_trapezoid, contours)
-    return trapezoids
+    edges = ip.auto_canny(im)
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours = map(lambda contour: cv2.approxPolyDP(contour, 0.05 * cv2.arcLength(contour, True), True), contours)
+    trapezoids = filter(lambda contour: len(contour) == 4, contours)
+    # To assume a contour is a card, it must be less than 10% the size of the image (no fewer than 12 cards allowed)
+    # and must be more than 2% of the image (no more than 24 cards allowed, with the whole set taking 1/2 the image)
+    return filter(lambda t: edges.size / 50 < cv2.contourArea(t) < edges.size / 10, trapezoids)
 
 
-def parse_image(card_image, cid, source_vertices):
+def parse_card_image(card_image, cid, source_vertices):
     card = Card(cid, source_vertices)
     count = Count(card_image)
     card.update_attribute(count)
@@ -51,10 +37,10 @@ def get_card_features(target_dimensions, im):
     card_borders = find_cards_in_image(im)
     transformer = transformation.Transformer(target_image_dimensions=target_dimensions)
     cards = {}
-    for cid, source_vertices in enumerate(card_borders):
-        card_image = transformer.transform(im, source_vertices)
-        border = np.fliplr(source_vertices).reshape((-1, 1, 2))
-        card = parse_image(card_image, cid, border)
+
+    for cid, border in enumerate(card_borders):
+        card_image = transformer.transform(im, border.copy())
+        card = parse_card_image(card_image, cid, border)
         cards[cid] = card
     return cards
 
@@ -62,9 +48,9 @@ def get_card_features(target_dimensions, im):
 # board is the group of cards that sets should be found in
 def generate_valid_sets(board, n=3):
     # iterate through all combinations of n SET cards
-    # note that this only creates combinations of cids
-    for cids in combinations(board.keys(),n):
-        cards = [board[c] for c in cids]
+    # note that this only creates combinations of card_ids
+    for card_ids in combinations(board.keys(), n):
+        cards = [board[card_id] for card_id in card_ids]
         # assume all cards will have the same attributes, so just pull from first card
         attributes = cards[0].attributes.keys()
         valid_set = True
@@ -72,38 +58,36 @@ def generate_valid_sets(board, n=3):
             # get the values for the current attribute for all cards
             # there should be 1 unique value (all same) or n unique values (all different)
             # if not, break early and set valid_set to False
-            a_vals = set(map(lambda x: x.attributes[a], cards))
-            if not (len(a_vals) == 1 or len(a_vals) == n):
+            a_values = set(map(lambda x: x.attributes[a], cards))
+            if not (len(a_values) == 1 or len(a_values) == n):
                 valid_set = False
                 break
         if valid_set:
-            yield sorted(cids)
+            yield sorted(card_ids)
 
 
 def visualize_set(card_set, im):
     nim = im.copy()
     color = (255, 0, 0)
-    cv2.drawContours(nim, map(lambda card: card.loc, card_set), -1, color, 3)
-    print map(lambda card: card.attributes['count'].data, card_set), \
-        map(lambda card: card.attributes['count'].classification, card_set)
-    ip.im_show(nim, "SET", 0)
-    pass
+    cv2.drawContours(nim, np.fliplr(map(lambda card: card.loc, card_set)), -1, color, 3)
+    cv2.imshow("SET", nim)
+    cv2.waitKey(0)
+
 
 fName = "../data/setTest.jpg"
-oim = ip.im_read(fName)
+oim = cv2.imread(fName, cv2.CV_LOAD_IMAGE_COLOR)
 all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim)
 
 
-for card in all_cards.values():
-    print card.attributes['infill'].data[0]
-for card in all_cards.values():
-    print card.attributes['infill'].data[1]
+for c in all_cards.values():
+    print c.attributes['infill'].data[0]
+for c in all_cards.values():
+    print c.attributes['infill'].data[1]
 
 
 learning.classify_attributes(all_cards, ['shape', 'color', 'count', 'infill'])
 
 for cid_set in generate_valid_sets(all_cards, n=3):
-    card_set = map(lambda cid: all_cards[cid], cid_set)
-    visualize_set(card_set, oim)
+    visualize_set(map(lambda cid: all_cards[cid], cid_set), oim)
 
-ip.close_window()
+cv2.destroyAllWindows()

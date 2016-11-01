@@ -17,9 +17,7 @@ class AbstractAttribute:
     def find_contours(self, card_image):
         card_image_mask = (255 - ip.im_mask(card_image))
         contours, _ = ip.cv2.findContours(card_image_mask, ip.cv2.RETR_EXTERNAL, ip.cv2.CHAIN_APPROX_SIMPLE)
-        card_area = card_image.shape[0] * card_image.shape[1]
-        contours = [contour for contour in contours
-                    if (card_area / 20) < ip.cv2.contourArea(contour)]
+        contours = filter(lambda contour: (card_image_mask.size / 20) < ip.cv2.contourArea(contour), contours)
         self.contours = contours
 
     def __eq__(self, other):
@@ -47,8 +45,11 @@ class Infill(AbstractAttribute):
     def parse_image(self, card_image):
         self.find_contours(card_image)
         card_image_mask = np.zeros((card_image.shape[0], card_image.shape[1]), dtype=np.uint8)
-        card_image_mask = ip.cv2.erode(card_image_mask, np.ones((15, 15), np.uint8), iterations=1)
         ip.cv2.drawContours(card_image_mask, self.contours, -1, 255, -1)
+        edges = ip.auto_canny(ip.bgr2gray(card_image))
+        #ip.cv2.imshow("TEST", edges)
+        #ip.cv2.waitKey(0)
+        card_image_mask = ip.cv2.erode(card_image_mask, np.ones((15, 15), np.uint8), iterations=1)
         color, std_dev = ip.cv2.meanStdDev(ip.bgr2gray(card_image), mask=card_image_mask.astype("uint8"))
         color = color[0][0]
         std_dev = std_dev[0][0]

@@ -8,13 +8,16 @@ class Transformer:
         self.target_image_dimensions = target_image_dimensions
         # if target vertices are not set, assume we want to fill the entire targetImage
         if not target_vertices:
+            rows, columns = target_image_dimensions[:2]
             self.target_vertices = np.array([[0, 0],
-                                             [0, target_image_dimensions[1]],
-                                             [target_image_dimensions[0], target_image_dimensions[1]],
-                                             [target_image_dimensions[0], 0]])
+                                             [0, columns],
+                                             [rows, 0],
+                                             [rows, columns]])
         else:
             self.target_vertices = target_vertices
 
+        r0, c0 = np.round(np.mean(self.target_vertices, axis=0)).astype(np.int32)
+        self.target_vertices = np.array(sorted(self.target_vertices, key=lambda (r, c): np.arctan2(r0 - r, c0 - c)))
         # get barycentric coordinates and corresponding points in target (new) image
         nys = np.arange(self.target_image_dimensions[0])
         nxs = np.arange(self.target_image_dimensions[1])
@@ -38,21 +41,14 @@ class Transformer:
 
     def transform(self, oim, source_vertices):
         nim = np.zeros(self.target_image_dimensions, np.uint8)
+
+        source_vertices = source_vertices.reshape((-1, 2))
+        source_vertices = np.fliplr(source_vertices)
+        r0, c0 = np.round(np.mean(source_vertices, axis=0)).astype(np.int32)
+        source_vertices = np.array(sorted(source_vertices, key=lambda (r, c): np.arctan2(r0 - r, c0 - c)))
+
         rpts = source_vertices[self.indices, :]
         original_row = np.multiply(rpts[:, :, 0], self.barycentric).sum(axis=1, keepdims=True).astype("int32")
         original_col = np.multiply(rpts[:, :, 1], self.barycentric).sum(axis=1, keepdims=True).astype("int32")
         nim[self.targetRow, self.targetCol, :] = oim[original_row, original_col, :].reshape((-1, 3))
         return nim
-
-
-# given a roughly trapezoidal contour, turn it into a simple trapezoid with only 4 vertices
-def simple_trapezoid(contour):
-    contour = np.reshape(contour, (len(contour), 2))
-    rectangle = np.zeros((4, 2), dtype="int32")
-    s = contour.sum(axis=1)
-    rectangle[0] = contour[np.argmin(s)]
-    rectangle[2] = contour[np.argmax(s)]
-    diff = np.diff(contour, axis=1)
-    rectangle[1] = contour[np.argmin(diff)]
-    rectangle[3] = contour[np.argmax(diff)]
-    return np.fliplr(rectangle)
