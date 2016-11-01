@@ -45,38 +45,14 @@ class Infill(AbstractAttribute):
             self.parse_image(card_image)
 
     def parse_image(self, card_image):
-        # self.find_contours(card_image)
-        # card_image_mask = np.zeros((card_image.shape[0], card_image.shape[1], 1))
-        # ip.cv2.drawContours(card_image_mask, self.contours, -1, (255, 0, 0), -1)
-        # color = ip.cv2.mean(card_image, (card_image_mask / 255.0).astype("uint8"))
-        # color = ip.cv2.cvtColor(np.uint8([[color]]), ip.cv2.COLOR_BGR2HSV)
-        # color = color[0][0]
-        # color = [color[0].astype('float') / 180.0 * 360.0, 255, 255]
-        #
-        # color2 = color.copy()
-        # color[0] = color[0].astype('float') / 180.0 * 360.0
-        # color[1] = 255.0
-        # color[2] = 255.0
-        # color = ip.cv2.cvtColor(np.uint8([[color]]), ip.cv2.COLOR_HSV2RGB)
-        # color = ip.cv2.cvtColor(color, ip.cv2.COLOR_RGB2BGR)[0][0]
-        # color = color.astype('float')
-        # swap = color[0]
-        # color[0] = color[1]
-        # color[1] = swap
-        #
-        # card_image = ip.cv2.GaussianBlur(card_image, (15, 15), 0)
-        #
-        # card_mask = (1 - ip.cv2.dilate(card_image_mask, np.ones((10, 10), np.uint8), iterations=1) / 255.0).astype("uint8")
-        # card_color = ip.cv2.mean(card_image, card_mask)
-        # infill_mask = (ip.cv2.erode(card_image_mask, np.ones((20, 20), np.uint8), iterations=1) / 255.0).astype("uint8")
-        #
-        # infill_color = ip.cv2.mean(card_image, infill_mask)
-        # infill_color2 = ip.cv2.cvtColor(np.uint8([[color2]]), ip.cv2.COLOR_HSV2BGR)[0][0]
-        #
-        # dA = np.absolute(np.subtract(np.int16([infill_color[:3]]), np.int16([card_color[:3]])))
-        # dB = np.absolute(np.subtract(np.int16([infill_color2[:3]]), np.int16([card_color[:3]])))
-        # #self.data = np.max(np.divide(dA.astype("float"), dB.astype("float"))
-        self.data = -1
+        self.find_contours(card_image)
+        card_image_mask = np.zeros((card_image.shape[0], card_image.shape[1]), dtype=np.uint8)
+        card_image_mask = ip.cv2.erode(card_image_mask, np.ones((15, 15), np.uint8), iterations=1)
+        ip.cv2.drawContours(card_image_mask, self.contours, -1, 255, -1)
+        color, std_dev = ip.cv2.meanStdDev(ip.bgr2gray(card_image), mask=card_image_mask.astype("uint8"))
+        color = color[0][0]
+        std_dev = std_dev[0][0]
+        self.data = [color, std_dev]
 
 
 class Shape(AbstractAttribute):
@@ -100,7 +76,7 @@ class Shape(AbstractAttribute):
             epsilon = 0.01*ip.cv2.arcLength(contour, True)
             simple_contour = ip.cv2.approxPolyDP(contour, epsilon, True)
             points.append(len(simple_contour))
-        self.data = map(np.round, [ip.np.mean(ap_ratio) ** 0.5 * 10, ip.np.mean(points) ** 0.5 * 10])
+        self.data = [ip.np.mean(ap_ratio) ** 0.5 * 10, ip.np.mean(points) ** 0.5 * 10]
 
 
 class Count(AbstractAttribute):
@@ -124,13 +100,12 @@ class Color(AbstractAttribute):
 
     def parse_image(self, card_image):
         self.find_contours(card_image)
-        card_image_mask = np.zeros((card_image.shape[0], card_image.shape[1], 1))
-        ip.cv2.drawContours(card_image_mask, self.contours, -1, (255, 0, 0), -1)
-        color = ip.cv2.mean(card_image, (card_image_mask / 255.0).astype("uint8"))
+        card_image_mask = np.zeros((card_image.shape[0], card_image.shape[1]), dtype=np.uint8)
+        ip.cv2.drawContours(card_image_mask, self.contours, -1, 255, -1)
+        color = ip.cv2.mean(card_image, mask=card_image_mask)
+
         color = ip.cv2.cvtColor(np.uint8([[color]]), ip.cv2.COLOR_BGR2HSV)
         color = color[0][0]
         theta = color[0] * 2  # H will be in [0, 180] convert to [0, 360]
         theta *= (np.pi / 180)  # convert to radians
         self.data = [np.cos(theta) / 2, np.sin(theta) / 2]  # reduce by 2 to make colors more likely to cluster
-
-

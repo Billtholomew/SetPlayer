@@ -93,6 +93,13 @@ fName = "../data/setTest.jpg"
 oim = ip.im_read(fName)
 all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim)
 
+
+for card in all_cards.values():
+    print card.attributes['infill'].data[0]
+for card in all_cards.values():
+    print card.attributes['infill'].data[1]
+
+
 learning.classify_attributes(all_cards, ['shape', 'color', 'count', 'infill'])
 
 for cid_set in generate_valid_sets(all_cards, n=3):
