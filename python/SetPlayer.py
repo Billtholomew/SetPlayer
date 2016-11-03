@@ -37,7 +37,6 @@ def get_card_features(target_dimensions, im):
     card_borders = find_cards_in_image(im)
     transformer = transformation.Transformer(target_image_dimensions=target_dimensions)
     cards = {}
-
     for cid, border in enumerate(card_borders):
         card_image = transformer.transform(im, border.copy())
         card = parse_card_image(card_image, cid, border)
@@ -69,6 +68,18 @@ def generate_valid_sets(board, n=3):
 def visualize_set(card_set, im):
     nim = im.copy()
     color = (255, 0, 0)
+    print '======================='
+    print '======================='
+    print '======================='
+    for card in card_set:
+        count_name = (card.attributes['count'].data[0], card.attributes['count'].classification)
+        color_name = (np.arctan2(card.attributes['color'].data[0], card.attributes['color'].data[1]) * 180 / np.pi,
+                      card.attributes['color'].classification)
+        print 'CARD', count_name, color_name
+        for k, v in card.attributes.iteritems():
+            if k=='color' or k=='count':
+                continue
+            print k, v.data, '->', v.classification
     cv2.drawContours(nim, np.fliplr(map(lambda card: card.loc, card_set)), -1, color, 3)
     cv2.imshow("SET", nim)
     cv2.waitKey(0)
@@ -77,13 +88,6 @@ def visualize_set(card_set, im):
 fName = "../data/setTest.jpg"
 oim = cv2.imread(fName, cv2.CV_LOAD_IMAGE_COLOR)
 all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim)
-
-
-for c in all_cards.values():
-    print c.attributes['infill'].data[0]
-for c in all_cards.values():
-    print c.attributes['infill'].data[1]
-
 
 learning.classify_attributes(all_cards, ['shape', 'color', 'count', 'infill'])
 

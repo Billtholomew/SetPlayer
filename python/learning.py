@@ -1,4 +1,4 @@
-from scipy.cluster.vq import kmeans, kmeans2, whiten
+from scipy.cluster.vq import kmeans, kmeans2, whiten, vq
 from numpy import array, linalg
 
 
@@ -23,12 +23,12 @@ def learn_classes_kmeans(data):
     k = 0
     print '--------'
     for d in data:
-        print d
-    while k < len(data):
+        print d[0], ',', d[1]
+    distortion = float('inf')
+    white_data = whiten(data)
+    while distortion > 0.33:
         k += 1
-        labels = temp_labels
-        centroids, temp_labels = kmeans2(data, k)
-        _, distortion = kmeans(whiten(data), k)
-        wk = Wk(centroids, temp_labels, data)
+        centroids, distortion = kmeans(white_data, k)
         print k, wk, distortion
+    labels = vq(white_data, centroids)
     return labels
