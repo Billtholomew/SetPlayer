@@ -45,20 +45,16 @@ class Infill(AbstractAttribute):
     def parse_image(self, card_image):
         self.find_contours(card_image)
 
-        card_image_mask = np.zeros((card_image.shape[0], card_image.shape[1]), dtype=np.uint8)
-        ip.cv2.drawContours(card_image_mask, self.contours, -1, 255, -1)
-        gray = ip.bgr2gray(card_image)
-        edges = ip.auto_canny(gray, .5)
-        #ip.cv2.imshow("TEST", gray)
-        #ip.cv2.waitKey(0)
-        card_image_mask = ip.cv2.erode(card_image_mask, np.ones((5, 5), np.uint8), iterations=5)
-        edges *= (card_image_mask / 255.0)
-        #ip.cv2.imshow("TEST", edges)
-        #ip.cv2.waitKey(0)
-        color, std_dev = ip.cv2.meanStdDev(ip.bgr2gray(card_image), mask=card_image_mask.astype("uint8"))
-        color = color[0][0]
-        std_dev = std_dev[0][0]
-        self.data = [color, std_dev]
+        shape_mask = np.zeros((card_image.shape[0], card_image.shape[1]))
+        ip.cv2.drawContours(shape_mask, self.contours, -1, 1, -1)
+        shape_mask = ip.cv2.erode(shape_mask, np.ones((16, 16), np.uint8), iterations=1)
+        card_image_hsv = ip.cv2.cvtColor(card_image, ip.cv2.COLOR_BGR2HSV)
+
+        shape_hsv = card_image_hsv[shape_mask == 1]
+        shape_saturation_mean = np.mean(shape_hsv[:, 1])
+        shape_saturation_median = np.median(shape_hsv[:, 1])
+
+        self.data = [shape_saturation_mean ** 0.5, np.log2(shape_saturation_median)]
 
 
 class Shape(AbstractAttribute):
@@ -106,12 +102,16 @@ class Color(AbstractAttribute):
 
     def parse_image(self, card_image):
         self.find_contours(card_image)
-        card_image_mask = np.zeros((card_image.shape[0], card_image.shape[1]), dtype=np.uint8)
-        ip.cv2.drawContours(card_image_mask, self.contours, -1, 255, -1)
-        color = ip.cv2.mean(card_image, mask=card_image_mask)
 
-        color = ip.cv2.cvtColor(np.uint8([[color]]), ip.cv2.COLOR_BGR2HSV)
-        color = color[0][0]
-        theta = color[0] * 2  # H will be in [0, 180] convert to [0, 360]
-        theta *= (np.pi / 180)  # convert to radians
-        self.data = [np.cos(theta) / 2, np.sin(theta) / 2]  # reduce by 2 to make colors more likely to cluster
+        shape_mask = np.zeros(card_image.shape)
+        ip.cv2.drawContours(shape_mask, self.contours, -1, (1, 1, 1), -1)
+        card_image_hsv = ip.cv2.cvtColor(card_image, ip.cv2.COLOR_BGR2HSV)
+        shape_hsv = card_image_hsv * shape_mask
+        shape_mask = shape_hsv[:, :, 1] > 64
+        shape_hue = shape_hsv[shape_mask, 0].astype(np.int32) * 2  # rescale to be [0, 360)
+        shape_hue_radians = shape_hue * (np.pi / 180)
+        xs = np.cos(shape_hue_radians)
+        x = np.mean(xs)
+        ys = np.sin(shape_hue_radians)
+        y = np.mean(ys)
+        self.data = [x, y]

@@ -44,6 +44,6 @@ def threshold_image(im, color_mu, color_std=0, sigma=1):
 
 
 def im_mask(im, sigma=1):
-    im_gray = bgr2gray(im)
+    im_gray = rgb2gray(im)
     card_color_mu, card_color_std = cv2.meanStdDev(im_gray)
-    return threshold_image(im_gray, card_color_mu, card_color_std).astype("uint8")
+    return threshold_image(im_gray, card_color_mu, card_color_std, sigma).astype("uint8")

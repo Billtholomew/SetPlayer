@@ -77,7 +77,7 @@ def visualize_set(card_set, im):
                       card.attributes['color'].classification)
         print 'CARD', count_name, color_name
         for k, v in card.attributes.iteritems():
-            if k=='color' or k=='count':
+            if k == 'color' or k == 'count':
                 continue
             print k, v.data, '->', v.classification
     cv2.drawContours(nim, np.fliplr(map(lambda card: card.loc, card_set)), -1, color, 3)
