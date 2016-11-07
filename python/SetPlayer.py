@@ -57,7 +57,7 @@ def generate_valid_sets(board, n=3):
             # get the values for the current attribute for all cards
             # there should be 1 unique value (all same) or n unique values (all different)
             # if not, break early and set valid_set to False
-            a_values = set(map(lambda x: x.attributes[a], cards))
+            a_values = set(map(lambda x: x.attributes[a].classification, cards))
             if not (len(a_values) == 1 or len(a_values) == n):
                 valid_set = False
                 break
@@ -68,8 +68,6 @@ def generate_valid_sets(board, n=3):
 def visualize_set(card_set, im):
     nim = im.copy()
     color = (255, 0, 0)
-    print '======================='
-    print '======================='
     print '======================='
     for card in card_set:
         count_name = (card.attributes['count'].data[0], card.attributes['count'].classification)
@@ -85,7 +83,7 @@ def visualize_set(card_set, im):
     cv2.waitKey(0)
 
 
-fName = "../data/setTest.jpg"
+fName = "../data/set_crooked.jpg"
 oim = cv2.imread(fName, cv2.CV_LOAD_IMAGE_COLOR)
 all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim)
 
