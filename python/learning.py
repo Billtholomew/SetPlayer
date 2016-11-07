@@ -7,11 +7,12 @@ def classify_attributes(all_cards, attributes_to_classify):
     for attribute in attributes_to_classify:
         attribute_data = map(lambda card: card.attributes[attribute].data, all_cards.values())
         attribute_data = array(attribute_data)
-        labels = learn_classes_kmeans(attribute_data)
+        labels, centroids = learn_classes_kmeans(attribute_data)
         print attribute, labels
         map(lambda x: x[0].attributes[attribute].classify(x[1]), zip(cards, labels))
 
 
+# normalized intra-cluster sums of squares
 # see here: https://datasciencelab.wordpress.com/2013/12/27/finding-the-k-in-k-means-clustering/
 def calculate_wk(centroids, labels, data):
     clusters = {l: data[labels == l] for l in set(labels)}
@@ -39,4 +40,4 @@ def learn_classes_kmeans(data):
         wk = calculate_wk(centroids, labels, white_data)
         # cost for adding another class. 1.5 or greater found experimentally to work
     #labels, centroids = vq(white_data, best_centroids)
-    return best_labels
+    return best_labels, best_centroids

@@ -1,5 +1,7 @@
-import numpy as np
+import sys
+import argparse
 from itertools import combinations
+import numpy as np
 import cv2
 
 import image_processing as ip
@@ -62,7 +64,7 @@ def generate_valid_sets(board, n=3):
                 valid_set = False
                 break
         if valid_set:
-            yield sorted(card_ids)
+            yield sorted([board[cid] for cid in card_ids], key=lambda c: c.cid)
 
 
 def visualize_set(card_set, im):
@@ -83,13 +85,48 @@ def visualize_set(card_set, im):
     cv2.waitKey(0)
 
 
-fName = "../data/set_crooked.jpg"
-oim = cv2.imread(fName, cv2.CV_LOAD_IMAGE_COLOR)
-all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim)
+def get_sets_from_image(oim, set_size=3):
+    all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim)
+    learning.classify_attributes(all_cards, ['shape', 'color', 'count', 'infill'])
+    return generate_valid_sets(all_cards, set_size)
 
-learning.classify_attributes(all_cards, ['shape', 'color', 'count', 'infill'])
 
-for cid_set in generate_valid_sets(all_cards, n=3):
-    visualize_set(map(lambda cid: all_cards[cid], cid_set), oim)
+def get_image_from_camera():
+    im = None
+    raise Exception('get_image_from_camera() not yet implemented')
+    return im
 
-cv2.destroyAllWindows()
+
+def main(filename=None, set_size=3):
+    try:
+        if filename is None:
+            oim = get_image_from_camera()
+        else:
+            oim = cv2.imread(filename, cv2.CV_LOAD_IMAGE_COLOR)
+        for card_set in get_sets_from_image(oim, set_size):
+            visualize_set(card_set, oim)
+    except Exception, e:
+        print e
+    finally:
+        cv2.destroyAllWindows()
+
+
+parser = argparse.ArgumentParser(description='Finds Sets in image of Set cards')
+parser.add_argument('--source', '-s', nargs='?', choices=['camera', 'file'], dest='source', required=True,
+                    help='where to get image from, if "file" --input <full path> is required')
+parser.add_argument('--input', '-i', nargs='?', dest='fName', const=str, default=None,
+                    help='full path of image to process')
+parser.add_argument('--set_size', nargs='?', dest='set_size', const=int, default=3,
+                    help='number of cards per set, Default: 3')
+args = parser.parse_args()
+
+if __name__ == '__main__':
+    if args.source == 'camera':
+        if args.fName is not None:
+            print 'Reading from camera. Option "--input/-i', args.fName+'"','will be ignored'
+        main(filename=None, set_size=args.set_size)
+    elif args.source == 'file':
+        if args.fName is not None:
+            main(filename=args.fName, set_size=args.set_size)
+        else:
+            print 'ERROR: With source set to "file", --input/-i must be set to the full path to file'
