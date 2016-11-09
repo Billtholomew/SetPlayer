@@ -37,7 +37,7 @@ def parse_card_image(card_image, cid, source_vertices):
 
 def get_card_features(target_dimensions, im):
     card_borders = find_cards_in_image(im)
-    transformer = transformation.Transformer(target_image_dimensions=target_dimensions)
+    transformer = transformation.Transformer(is_target=True, image_dimensions=target_dimensions)
     cards = {}
     for cid, border in enumerate(card_borders):
         card_image = transformer.transform(im, border.copy())
@@ -85,8 +85,27 @@ def visualize_set(card_set, im):
     cv2.waitKey(0)
 
 
+def visualize_attributes(cards, im):
+    rows, columns = (int(270), int(420))
+    source_vertices = np.array([[0, 0],
+                                [0, columns - 1],
+                                [rows - 1, 0],
+                                [rows - 1, columns - 1]])
+    transformer = transformation.Transformer(False, (int(270), int(420), 3), source_vertices)
+    for card in cards:
+        new_card_image = card.visualize_card((int(270), int(420), 3))
+        target_vertices = card.loc.reshape((-1, 2))
+        im = transformer.transform(new_card_image, target_vertices, im.copy())
+    cv2.imshow("Board AR", im)
+    cv2.waitKey(0)
+
+
 def get_sets_from_image(oim, set_size=3):
     all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim)
+    visualize_attributes(all_cards.values(), oim.copy())
+    #for i, card in all_cards.iteritems():
+    #    card.visualize_card(card_size=(int(270), int(420), 3))
+    #    pass
     learning.classify_attributes(all_cards, ['shape', 'color', 'count', 'infill'])
     return generate_valid_sets(all_cards, set_size)
 

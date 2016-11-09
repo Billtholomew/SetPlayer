@@ -47,3 +47,32 @@ def im_mask(im, sigma=1):
     im_gray = rgb2gray(im)
     card_color_mu, card_color_std = cv2.meanStdDev(im_gray)
     return threshold_image(im_gray, card_color_mu, card_color_std, sigma).astype("uint8")
+
+
+def contour_xy2polar(contour, n_points=180):
+    # get current polar coordinates
+    m = cv2.moments(contour)
+    cy = int(m['m01'] / m['m00'])
+    cx = int(m['m10'] / m['m00'])
+    polar = map(lambda (x, y):
+                (np.arctan2(cy - y, cx - x), np.sqrt((cx - x) ** 2 + (cy - y) ** 2)),
+                map(lambda pt: pt[0], contour))
+    polar = sorted(polar, key=lambda (t, r): t)
+    thetas = map(lambda (t, r): t, polar)
+    radii = map(lambda (t, r): r, polar)
+    # interpolate to new polar coordinates based on number of critical points to use (n_points)
+    new_thetas = map(lambda t: t * np.pi / 180, range(-180, 180, 360 / n_points))
+    new_radii = np.interp(new_thetas, thetas, radii)
+    # normalize
+    new_radii = map(lambda r: r / max(new_radii), new_radii)
+    new_polar = zip(new_thetas, new_radii)
+    return new_polar
+
+
+def contour_polar2xy(contour_polar, scale=1, center=(0, 0)):
+    cy = center[0]
+    cx = center[1]
+    contour_xy = map(lambda (theta, radius):
+                     [[int(np.cos(theta) * radius * scale + cx), int(np.sin(theta) * radius * scale + cy)]],
+                     contour_polar)
+    return np.array(contour_xy)

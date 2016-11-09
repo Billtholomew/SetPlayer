@@ -22,15 +22,15 @@ def calculate_wk(centroids, labels, data):
 # Pass in a list of a the data for a single attribute for all cards
 def learn_classes_kmeans(data):
     print '--------'
-    for d in data:
-        print ','.join(map(str,d))
+    #for d in data:
+    #    print ','.join(map(str,d))
     white_data = whiten(data)
-    k = 1
+    k = 0
     prev_wk = float('inf')
     centroids = [mean(data)]
     labels = [0 for _ in data]
     wk = 1
-    while (prev_wk - wk) > 0.05:
+    while abs(prev_wk - wk) > 0.05 and k < len(data):
         k += 1
         prev_wk = wk
         best_centroids = centroids
@@ -38,6 +38,8 @@ def learn_classes_kmeans(data):
         centroids, distortion = kmeans(white_data, k)
         labels, _ = vq(white_data, centroids)
         wk = calculate_wk(centroids, labels, white_data)
+        print k, wk, distortion
         # cost for adding another class. 1.5 or greater found experimentally to work
     #labels, centroids = vq(white_data, best_centroids)
+
     return best_labels, best_centroids
