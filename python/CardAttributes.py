@@ -8,11 +8,13 @@ class AbstractAttribute:
     def __init__(self, name=None, default_data=None):
         self.name = name
         self.data = default_data
+        self.class_data = None
         self.contours = None
         self.classification = None
 
-    def classify(self, classification):
+    def classify(self, classification, centroid):
         self.classification = classification
+        self.class_data = centroid
 
     def find_contours(self, card_image):
         card_image_mask = (255 - ip.im_mask(card_image))
@@ -68,10 +70,6 @@ class Shape(AbstractAttribute):
         self.find_contours(card_image)
         efficiency = []
         complexity = []
-
-        #ip.cv2.imshow("CARD", card_image)
-        #ip.cv2.waitKey(0)
-
         shapes_radii = []
 
         for contour in self.contours:
@@ -117,7 +115,7 @@ class Count(AbstractAttribute):
 
     def parse_image(self, card_image):
         self.find_contours(card_image)
-        self.data = (len(self.contours), len(self.contours) ** 2)
+        self.data = [len(self.contours), len(self.contours) ** 2]
 
 
 class Color(AbstractAttribute):

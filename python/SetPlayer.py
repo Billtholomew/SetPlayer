@@ -85,7 +85,7 @@ def visualize_set(card_set, im):
     cv2.waitKey(0)
 
 
-def visualize_attributes(cards, im):
+def overlay_ar_board(cards, im):
     rows, columns = (int(270), int(420))
     source_vertices = np.array([[0, 0],
                                 [0, columns - 1],
@@ -96,18 +96,18 @@ def visualize_attributes(cards, im):
         new_card_image = card.visualize_card((int(270), int(420), 3))
         target_vertices = card.loc.reshape((-1, 2))
         im = transformer.transform(new_card_image, target_vertices, im.copy())
-    cv2.imshow("Board AR", im)
-    cv2.waitKey(0)
+    return im
 
 
 def get_sets_from_image(oim, set_size=3):
     all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim)
-    visualize_attributes(all_cards.values(), oim.copy())
     #for i, card in all_cards.iteritems():
     #    card.visualize_card(card_size=(int(270), int(420), 3))
     #    pass
     learning.classify_attributes(all_cards, ['shape', 'color', 'count', 'infill'])
-    return generate_valid_sets(all_cards, set_size)
+    oim = overlay_ar_board(all_cards.values(), oim)
+    valid_sets = generate_valid_sets(all_cards, set_size)
+    return oim, valid_sets
 
 
 def get_image_from_camera():
@@ -122,7 +122,8 @@ def main(filename=None, set_size=3):
             oim = get_image_from_camera()
         else:
             oim = cv2.imread(filename, cv2.CV_LOAD_IMAGE_COLOR)
-        for card_set in get_sets_from_image(oim, set_size):
+        oim, valid_set_generator = get_sets_from_image(oim, set_size)
+        for card_set in valid_set_generator:
             visualize_set(card_set, oim)
     except Exception, e:
         print e

@@ -1,5 +1,5 @@
 from scipy.cluster.vq import kmeans, kmeans2, whiten, vq
-from numpy import array, linalg, mean
+from numpy import array, linalg, mean, std
 
 
 def classify_attributes(all_cards, attributes_to_classify):
@@ -9,7 +9,7 @@ def classify_attributes(all_cards, attributes_to_classify):
         attribute_data = array(attribute_data)
         labels, centroids = learn_classes_kmeans(attribute_data)
         print attribute, labels
-        map(lambda x: x[0].attributes[attribute].classify(x[1]), zip(cards, labels))
+        map(lambda x: x[0].attributes[attribute].classify(x[1], centroids[x[1]]), zip(cards, labels))
 
 
 # normalized intra-cluster sums of squares
@@ -26,11 +26,11 @@ def learn_classes_kmeans(data):
     #    print ','.join(map(str,d))
     white_data = whiten(data)
     k = 0
-    prev_wk = float('inf')
     centroids = [mean(data)]
     labels = [0 for _ in data]
-    wk = 1
-    while abs(prev_wk - wk) > 0.05 and k < len(data):
+    prev_wk = float('inf')
+    wk = calculate_wk(centroids, labels, white_data) * len(data) # basically just a really big number
+    while abs(prev_wk - wk) > 0.075 and k < len(data):
         k += 1
         prev_wk = wk
         best_centroids = centroids
@@ -41,5 +41,7 @@ def learn_classes_kmeans(data):
         print k, wk, distortion
         # cost for adding another class. 1.5 or greater found experimentally to work
     #labels, centroids = vq(white_data, best_centroids)
+
+    best_centroids *= std(data, axis=0)
 
     return best_labels, best_centroids
