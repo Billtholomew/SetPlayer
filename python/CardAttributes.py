@@ -17,9 +17,9 @@ class AbstractAttribute:
         self.class_data = centroid
 
     def find_contours(self, card_image):
-        card_image_mask = (255 - ip.im_mask(card_image))
-        contours, _ = ip.cv2.findContours(card_image_mask, ip.cv2.RETR_EXTERNAL, ip.cv2.CHAIN_APPROX_SIMPLE)
-        contours = filter(lambda contour: (card_image_mask.size / 20) < ip.cv2.contourArea(contour), contours)
+        shape_mask = (255 - ip.im_mask(card_image, sigma=1.5))
+        contours, _ = ip.cv2.findContours(shape_mask, ip.cv2.RETR_EXTERNAL, ip.cv2.CHAIN_APPROX_SIMPLE)
+        contours = filter(lambda contour: (shape_mask.size / 20) < ip.cv2.contourArea(contour), contours)
         self.contours = contours
 
     def __eq__(self, other):
@@ -68,42 +68,17 @@ class Shape(AbstractAttribute):
 
     def parse_image(self, card_image):
         self.find_contours(card_image)
-        efficiency = []
-        complexity = []
-        shapes_radii = []
 
-        for contour in self.contours:
+        shapes_radii = np.mean(
+            map(lambda contour: map(lambda (t, r): r, ip.contour_xy2polar(contour, n_points=180)), self.contours),
+            axis=0)
 
-            nim = np.zeros(card_image.shape)
-            cy = int(nim.shape[0] / 2)
-            cx = int(nim.shape[1] / 2)
-            contour_polar = ip.contour_xy2polar(contour)
-
-            shapes_radii.append(map(lambda (t, r): r, contour_polar))
-
-            contour_xy = ip.contour_polar2xy(contour_polar, scale=100, center=(cy, cx))
-            #ip.cv2.drawContours(nim, [contour_xy], -1, (255, 0, 0), 3)
-            #ip.cv2.imshow("TEST", nim)
-            #ip.cv2.waitKey(0)
-
-            epsilon = 0.01 * ip.cv2.arcLength(contour, True)
-            simple_contour = ip.cv2.approxPolyDP(contour, epsilon, True)
-            efficiency.append(float(len(contour)) / float(len(simple_contour)))
-
-            hull_i = ip.cv2.convexHull(contour, returnPoints=False)
-            depths = map(lambda (p1, p2, p3, d): d / 256.0, ip.cv2.convexityDefects(contour, hull_i).reshape((-1, 4)))
-            defects = filter(lambda d: d > epsilon, depths)
-            complexity.append(2 ** len(defects))
-
-        shapes_radii = np.mean(shapes_radii, axis=0)
         # smooth
         kernel_size = 7
         kernel = np.ones(kernel_size) / float(kernel_size)
         shapes_radii = np.hstack((shapes_radii[-kernel_size / 2 + 1:], shapes_radii, shapes_radii[:kernel_size / 2]))
         shapes_radii = np.convolve(shapes_radii, kernel, mode='valid')
         self.data = shapes_radii.tolist()
-
-        #self.data = [np.mean(efficiency), np.min(complexity)]
 
 
 class Count(AbstractAttribute):
