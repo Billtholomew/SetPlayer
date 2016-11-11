@@ -30,6 +30,7 @@ def learn_classes_kmeans(data):
     wks = {k: wks[k-1] / max(wks) for k in ks}
 
     k = 1
+    best_k = 1
     diff = 1
     while k < len(data) and diff >= 0.1:
         best_k = k

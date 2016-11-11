@@ -3,16 +3,15 @@ from itertools import combinations
 import numpy as np
 import cv2
 
-import image_processing as ip
 import transformation
 import learning
 from Card import Card
-from CardAttributes import Count, Color, Shape, Infill
+from image_processing import auto_canny
 
 
 def find_cards_in_image(im):
     im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-    edges = ip.auto_canny(im)
+    edges = auto_canny(im)
     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = map(lambda contour: cv2.approxPolyDP(contour, 0.05 * cv2.arcLength(contour, True), True), contours)
     trapezoids = filter(lambda contour: len(contour) == 4, contours)
@@ -22,15 +21,7 @@ def find_cards_in_image(im):
 
 
 def parse_card_image(card_image, cid, source_vertices):
-    card = Card(cid, source_vertices)
-    count = Count(card_image)
-    card.update_attribute(count)
-    color = Color(card_image)
-    card.update_attribute(color)
-    shape = Shape(card_image)
-    card.update_attribute(shape)
-    infill = Infill(card_image)
-    card.update_attribute(infill)
+    card = Card(cid, source_vertices, card_image)
     return card
 
 
@@ -96,18 +87,12 @@ def get_sets_from_image(oim, set_size=3):
     return oim, valid_sets
 
 
-def get_image_from_camera():
-    im = None
-    raise Exception('get_image_from_camera() not yet implemented')
-    return im
-
-
 def main(filename=None, set_size=3):
     try:
         if filename is None:
-            oim = get_image_from_camera()
+            raise Exception('get_image_from_camera() not yet implemented')
         else:
-            oim = cv2.imread(filename, cv2.CV_LOAD_IMAGE_COLOR)
+            oim = cv2.imread(filename, flags=1)
         oim, valid_set_generator = get_sets_from_image(oim, set_size)
         for card_set in valid_set_generator:
             visualize_set(card_set, oim)
@@ -129,7 +114,7 @@ args = parser.parse_args()
 if __name__ == '__main__':
     if args.source == 'camera':
         if args.fName is not None:
-            print 'Reading from camera. Option "--input/-i', args.fName+'"','will be ignored'
+            print 'Reading from camera. Option "--input/-i', args.fName+'"', 'will be ignored'
         main(filename=None, set_size=args.set_size)
     elif args.source == 'file':
         if args.fName is not None:
