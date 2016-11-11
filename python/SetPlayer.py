@@ -20,19 +20,11 @@ def find_cards_in_image(im):
     return filter(lambda t: edges.size / 50 < cv2.contourArea(t) < edges.size / 10, trapezoids)
 
 
-def parse_card_image(card_image, cid, source_vertices):
-    card = Card(cid, source_vertices, card_image)
-    return card
-
-
-def get_card_features(target_dimensions, im):
+def get_card_features(target_dimensions, im, shape_points):
     card_borders = find_cards_in_image(im)
     transformer = transformation.Transformer(is_target=True, image_dimensions=target_dimensions)
-    cards = {}
-    for cid, border in enumerate(card_borders):
-        card_image = transformer.transform(im, border.copy())
-        card = parse_card_image(card_image, cid, border)
-        cards[cid] = card
+    cards = {cid: Card(cid, border, transformer.transform(im, border.copy()), shape_points)
+             for cid, border in enumerate(card_borders)}
     return cards
 
 
@@ -71,31 +63,36 @@ def overlay_ar_board(cards, im):
                                 [0, columns - 1],
                                 [rows - 1, 0],
                                 [rows - 1, columns - 1]])
+
     transformer = transformation.Transformer(False, (int(270), int(420), 3), source_vertices)
-    for card in cards:
-        new_card_image = card.visualize_card((int(270), int(420), 3))
-        target_vertices = card.loc.reshape((-1, 2))
-        im = transformer.transform(new_card_image, target_vertices, im.copy())
+    map(lambda card:
+        transformer.transform(card.visualize_card((int(270), int(420), 3)), card.loc.reshape((-1, 2)), im),
+        cards)
+
     return im
 
 
-def get_sets_from_image(oim, set_size=3):
-    all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim)
-    learning.classify_attributes(all_cards, ['shape', 'color', 'count', 'infill'])
-    oim = overlay_ar_board(all_cards.values(), oim)
-    valid_sets = generate_valid_sets(all_cards, set_size)
+def get_sets_from_image(oim, set_size=3, view_ar=False):
+    #import time
+    #t = time.time()
+    all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim, shape_points=180)  # 1.34 s
+    #print time.time() - t
+    learning.classify_attributes(all_cards, ['shape', 'color', 'count', 'infill'], max_k=5)  # 1.05 s, but f(max_k)
+    if view_ar:
+        oim = overlay_ar_board(all_cards.values(), oim)  # 1.03 s
+    valid_sets = generate_valid_sets(all_cards, set_size)  # 0.00 s
     return oim, valid_sets
 
 
-def main(filename=None, set_size=3):
+def main(filename=None, set_size=3, view_ar=False):
+    if filename is None:
+        raise Exception('get_image_from_camera() not yet implemented')
+    else:
+        oim = cv2.imread(filename, flags=1)
+    oim, valid_set_generator = get_sets_from_image(oim, set_size, view_ar)
+    map(lambda card_set: visualize_set(card_set, oim), valid_set_generator)
     try:
-        if filename is None:
-            raise Exception('get_image_from_camera() not yet implemented')
-        else:
-            oim = cv2.imread(filename, flags=1)
-        oim, valid_set_generator = get_sets_from_image(oim, set_size)
-        for card_set in valid_set_generator:
-            visualize_set(card_set, oim)
+        pass
     except Exception, e:
         print e
     finally:
@@ -109,15 +106,17 @@ parser.add_argument('--input', '-i', nargs='?', dest='fName', const=str, default
                     help='full path of image to process')
 parser.add_argument('--set_size', nargs='?', dest='set_size', const=int, default=3,
                     help='number of cards per set, Default: 3')
+parser.add_argument('--view_ar', dest='view_ar', default=False, action='store_true',
+                    help='include tag to view augmented reality version (see program''s version of cards)')
 args = parser.parse_args()
 
 if __name__ == '__main__':
     if args.source == 'camera':
         if args.fName is not None:
             print 'Reading from camera. Option "--input/-i', args.fName+'"', 'will be ignored'
-        main(filename=None, set_size=args.set_size)
+        main(filename=None, set_size=args.set_size, view_ar=args.view_ar)
     elif args.source == 'file':
         if args.fName is not None:
-            main(filename=args.fName, set_size=args.set_size)
+            main(filename=args.fName, set_size=args.set_size, view_ar=args.view_ar)
         else:
             print 'ERROR: With source set to "file", --input/-i must be set to the full path to file'

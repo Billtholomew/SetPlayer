@@ -5,15 +5,22 @@ from image_processing import im_mask, contour_polar2xy, contour_xy2polar
 
 
 class Card:
-    def __init__(self, cid, loc, card_image):
+    def __init__(self, cid, loc, card_image, shape_points):
         self.cid = cid
         self.loc = loc  # 4 vertices of quadrilateral in image
         self.contours = self.find_contours(card_image)
         self.attributes = {}
-        self.update_attribute(Count(self.contours))
-        self.update_attribute(Shape(self.contours))
-        self.update_attribute(Color(card_image, self.contours))
-        self.update_attribute(Infill(card_image, self.contours))
+        self.shape_points = shape_points
+
+        self.update_attribute(Count(self.contours))  # 0.000 s
+        self.update_attribute(Shape(self.contours, shape_points))  # 0.02 s
+
+        shape_mask = np.zeros((card_image.shape[0], card_image.shape[1]))
+        cv2.drawContours(shape_mask, self.contours, -1, 1, -1)
+        card_image_hsv = cv2.cvtColor(card_image, cv2.COLOR_BGR2HSV)
+
+        self.update_attribute(Color(card_image_hsv, shape_mask))  # 0.002 s
+        self.update_attribute(Infill(card_image_hsv, shape_mask))  # 0.002 s
 
     @staticmethod
     def find_contours(card_image):
@@ -31,7 +38,7 @@ class Card:
         count = int(self.attributes['count'].class_data[0])
 
         radii = self.attributes['shape'].class_data
-        thetas = map(lambda t: t * np.pi / 180, range(-180, 180, 360 / 180))
+        thetas = map(lambda t: t * np.pi / 180, range(-180, 180, 360 / self.shape_points))
         shape = zip(thetas, radii)
 
         color = self.attributes['color'].class_data
@@ -48,8 +55,8 @@ class Card:
 
         # figure out how to fit all count shapes into im
         for i in xrange(count):
-            h = shape[45][1] + shape[135][1]
-            w = shape[0][1] + shape[90][1]
+            h = shape[1 * self.shape_points / 4][1] + shape[3 * self.shape_points / 4][1]
+            w = shape[0 * self.shape_points / 4][1] + shape[2 * self.shape_points / 4][1]
             scale = min(im.shape[0] / h * 0.8, im.shape[1] / w * .8 / count)
 
             cy = int(im.shape[0] / 2)
@@ -100,14 +107,14 @@ class Count(AbstractAttribute):
 
 
 class Shape(AbstractAttribute):
-    def __init__(self, contours):
+    def __init__(self, contours, shape_points):
         AbstractAttribute.__init__(self, name='shape', default_data=None)
-        self.parse_image(contours)
+        self.parse_image(contours, shape_points)
 
-    def parse_image(self, contours):
+    def parse_image(self, contours, shape_points):
 
         shapes_radii = np.mean(
-            map(lambda contour: map(lambda (t, r): r, contour_xy2polar(contour, n_points=180)), contours),
+            map(lambda contour: map(lambda (t, r): r, contour_xy2polar(contour, n_points=shape_points)), contours),
             axis=0)
 
         # smooth
@@ -119,17 +126,12 @@ class Shape(AbstractAttribute):
 
 
 class Color(AbstractAttribute):
-    def __init__(self, card_image, contours):
+    def __init__(self, card_image_hsv, shape_mask):
         AbstractAttribute.__init__(self, name='color', default_data={})
-        self.parse_image(card_image, contours)
+        self.parse_image(card_image_hsv, shape_mask)
 
-    def parse_image(self, card_image, contours):
-
-        shape_mask = np.zeros(card_image.shape)
-        cv2.drawContours(shape_mask, contours, -1, (1, 1, 1), -1)
-        card_image_hsv = cv2.cvtColor(card_image, cv2.COLOR_BGR2HSV)
-
-        shape_hsv = card_image_hsv * shape_mask
+    def parse_image(self, card_image_hsv, shape_mask):
+        shape_hsv = card_image_hsv * np.dstack((shape_mask, shape_mask, shape_mask))
         shape_mask = shape_hsv[:, :, 1] > 64
         shape_hue = shape_hsv[shape_mask, 0].astype(np.int32) * 2  # rescale to be [0, 360)
         shape_hue_radians = shape_hue * (np.pi / 180)
@@ -141,16 +143,12 @@ class Color(AbstractAttribute):
 
 
 class Infill(AbstractAttribute):
-    def __init__(self, card_image, contours):
+    def __init__(self, card_image, shape_mask):
         AbstractAttribute.__init__(self, name='infill', default_data=None)
-        self.parse_image(card_image, contours)
+        self.parse_image(card_image, shape_mask)
 
-    def parse_image(self, card_image, contours):
-
-        shape_mask = np.zeros((card_image.shape[0], card_image.shape[1]))
-        cv2.drawContours(shape_mask, contours, -1, 1, -1)
-        shape_mask = cv2.erode(shape_mask, np.ones((16, 16), np.uint8), iterations=1)
-        card_image_hsv = cv2.cvtColor(card_image, cv2.COLOR_BGR2HSV)
+    def parse_image(self, card_image_hsv, shape_mask):
+        shape_mask = cv2.erode(shape_mask[:, :,], np.ones((16, 16), np.uint8), iterations=1)
 
         shape_hsv = card_image_hsv[shape_mask == 1]
         shape_saturation_mean = np.mean(shape_hsv[:, 1])

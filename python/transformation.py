@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.spatial import Delaunay
-from cv2 import pointPolygonTest
 
 
 class Transformer:
@@ -8,6 +7,7 @@ class Transformer:
     # create either a source or a target triangulation
     # this object can be re-used for all processes with a common source or target shape
     def __init__(self, is_target, image_dimensions, vertices=None):
+
         self.image_dimensions = image_dimensions
         # if vertices are not set, assume we want to use the entire image
         if vertices is None:
@@ -25,17 +25,20 @@ class Transformer:
         nys = np.arange(self.image_dimensions[0])
         nxs = np.arange(self.image_dimensions[1])
         image_pixels = np.transpose([np.repeat(nys, len(nxs)), np.tile(nxs, len(nys))])
-        image_pixels = filter(lambda pt:
-                              pointPolygonTest(np.array(self.vertices), tuple(pt), False) >= 0,
-                              image_pixels)
+
         image_pixels = np.array(image_pixels)
 
         triangles = Delaunay(self.vertices)
+
+        # code below is abbout 0.01 s
         memberships = triangles.find_simplex(image_pixels)  # returns the triangle that each pixel is a member of
         Ts = triangles.transform[memberships, :2]  # transformation matrices
         prs = image_pixels - triangles.transform[memberships, 2]  # intermediate transformation
 
-        barycentric_coordinates = np.array([Ts[i].dot(pr) for i, pr in enumerate(prs)])
+        # code below is almost 1 s
+        bl = Ts[:, 0, 0] * prs[:, 0] + Ts[:, 0, 1] * prs[:, 1]
+        br = Ts[:, 1, 0] * prs[:, 0] + Ts[:, 1, 1] * prs[:, 1]
+        barycentric_coordinates = np.hstack((bl.reshape((-1, 1)), br.reshape((-1, 1))))
         barycentric_coordinates = np.hstack((barycentric_coordinates,
                                             1 - np.sum(barycentric_coordinates, axis=1, keepdims=True)))
 

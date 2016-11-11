@@ -58,13 +58,12 @@ def contour_xy2polar(contour, n_points=180):
                 (np.arctan2(cy - y, cx - x), np.sqrt((cx - x) ** 2 + (cy - y) ** 2)),
                 map(lambda pt: pt[0], contour))
     polar = sorted(polar, key=lambda (t, r): t)
-    thetas = map(lambda (t, r): t, polar)
-    radii = map(lambda (t, r): r, polar)
+    thetas, radii = zip(*polar)
     # interpolate to new polar coordinates based on number of critical points to use (n_points)
-    new_thetas = map(lambda t: t * np.pi / 180, range(-180, 180, 360 / n_points))
+    new_thetas = np.pi / 180 * np.arange(-180, 180, 360 / n_points)
     new_radii = np.interp(new_thetas, thetas, radii)
     # normalize
-    new_radii = map(lambda r: r / max(new_radii), new_radii)
+    new_radii /= max(new_radii)
     new_polar = zip(new_thetas, new_radii)
     return new_polar
 
