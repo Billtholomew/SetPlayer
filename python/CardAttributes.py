@@ -17,9 +17,9 @@ class AbstractAttribute:
         self.class_data = centroid
 
     def find_contours(self, card_image):
-        shape_mask = (255 - ip.im_mask(card_image, sigma=1.5))
-        contours, _ = ip.cv2.findContours(shape_mask, ip.cv2.RETR_EXTERNAL, ip.cv2.CHAIN_APPROX_SIMPLE)
-        contours = filter(lambda contour: (shape_mask.size / 20) < ip.cv2.contourArea(contour), contours)
+        card_image_mask = (255 - ip.im_mask(card_image))
+        contours, _ = ip.cv2.findContours(card_image_mask, ip.cv2.RETR_EXTERNAL, ip.cv2.CHAIN_APPROX_SIMPLE)
+        contours = filter(lambda contour: (card_image_mask.size / 20) < ip.cv2.contourArea(contour), contours)
         self.contours = contours
 
     def __eq__(self, other):
@@ -68,6 +68,9 @@ class Shape(AbstractAttribute):
 
     def parse_image(self, card_image):
         self.find_contours(card_image)
+
+        if len(self.contours) == 0:
+            pass
 
         shapes_radii = np.mean(
             map(lambda contour: map(lambda (t, r): r, ip.contour_xy2polar(contour, n_points=180)), self.contours),

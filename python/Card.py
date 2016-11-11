@@ -20,7 +20,7 @@ class Card:
 
         count = int(self.attributes['count'].class_data[0])
 
-        radii = self.attributes['shape'].data
+        radii = self.attributes['shape'].class_data
         thetas = map(lambda t: t * np.pi / 180, range(-180, 180, 360 / 180))
         shape = zip(thetas, radii)
 

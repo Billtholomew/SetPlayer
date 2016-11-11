@@ -101,9 +101,6 @@ def overlay_ar_board(cards, im):
 
 def get_sets_from_image(oim, set_size=3):
     all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim)
-    #for i, card in all_cards.iteritems():
-    #    card.visualize_card(card_size=(int(270), int(420), 3))
-    #    pass
     learning.classify_attributes(all_cards, ['shape', 'color', 'count', 'infill'])
     oim = overlay_ar_board(all_cards.values(), oim)
     valid_sets = generate_valid_sets(all_cards, set_size)
@@ -117,18 +114,15 @@ def get_image_from_camera():
 
 
 def main(filename=None, set_size=3):
-    try:
-        if filename is None:
-            oim = get_image_from_camera()
-        else:
-            oim = cv2.imread(filename, cv2.CV_LOAD_IMAGE_COLOR)
-        oim, valid_set_generator = get_sets_from_image(oim, set_size)
-        for card_set in valid_set_generator:
-            visualize_set(card_set, oim)
-    except Exception, e:
-        print e
-    finally:
-        cv2.destroyAllWindows()
+    if filename is None:
+        oim = get_image_from_camera()
+    else:
+        oim = cv2.imread(filename, cv2.CV_LOAD_IMAGE_COLOR)
+    oim, valid_set_generator = get_sets_from_image(oim, set_size)
+    for card_set in valid_set_generator:
+        visualize_set(card_set, oim)
+
+    cv2.destroyAllWindows()
 
 
 parser = argparse.ArgumentParser(description='Finds Sets in image of Set cards')
