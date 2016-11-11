@@ -1,4 +1,3 @@
-import random
 from scipy.cluster.vq import kmeans, whiten, vq
 from numpy import array, linalg, max, std
 
@@ -9,7 +8,6 @@ def classify_attributes(all_cards, attributes_to_classify):
         attribute_data = map(lambda card: card.attributes[attribute].data, all_cards.values())
         attribute_data = array(attribute_data)
         k, labels, centroids = learn_classes_kmeans(attribute_data)
-        print attribute, k, labels
         map(lambda x: x[0].attributes[attribute].classify(x[1], centroids[x[1]]), zip(cards, labels))
 
 

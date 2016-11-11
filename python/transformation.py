@@ -1,6 +1,6 @@
-import cv2
 import numpy as np
 from scipy.spatial import Delaunay
+from cv2 import pointPolygonTest
 
 
 class Transformer:
@@ -26,7 +26,7 @@ class Transformer:
         nxs = np.arange(self.image_dimensions[1])
         image_pixels = np.transpose([np.repeat(nys, len(nxs)), np.tile(nxs, len(nys))])
         image_pixels = filter(lambda pt:
-                              cv2.pointPolygonTest(np.array(self.vertices), tuple(pt), False) >= 0,
+                              pointPolygonTest(np.array(self.vertices), tuple(pt), False) >= 0,
                               image_pixels)
         image_pixels = np.array(image_pixels)
 

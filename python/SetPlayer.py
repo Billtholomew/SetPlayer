@@ -1,4 +1,3 @@
-import sys
 import argparse
 from itertools import combinations
 import numpy as np
@@ -70,16 +69,6 @@ def generate_valid_sets(board, n=3):
 def visualize_set(card_set, im):
     nim = im.copy()
     color = (255, 0, 0)
-    print '======================='
-    for card in card_set:
-        count_name = (card.attributes['count'].data[0], card.attributes['count'].classification)
-        color_name = (np.arctan2(card.attributes['color'].data[0], card.attributes['color'].data[1]) * 180 / np.pi,
-                      card.attributes['color'].classification)
-        print 'CARD', count_name, color_name
-        for k, v in card.attributes.iteritems():
-            if k == 'color' or k == 'count':
-                continue
-            print k, v.data, '->', v.classification
     cv2.drawContours(nim, np.fliplr(map(lambda card: card.loc, card_set)), -1, color, 3)
     cv2.imshow("SET", nim)
     cv2.waitKey(0)
@@ -114,15 +103,18 @@ def get_image_from_camera():
 
 
 def main(filename=None, set_size=3):
-    if filename is None:
-        oim = get_image_from_camera()
-    else:
-        oim = cv2.imread(filename, cv2.CV_LOAD_IMAGE_COLOR)
-    oim, valid_set_generator = get_sets_from_image(oim, set_size)
-    for card_set in valid_set_generator:
-        visualize_set(card_set, oim)
-
-    cv2.destroyAllWindows()
+    try:
+        if filename is None:
+            oim = get_image_from_camera()
+        else:
+            oim = cv2.imread(filename, cv2.CV_LOAD_IMAGE_COLOR)
+        oim, valid_set_generator = get_sets_from_image(oim, set_size)
+        for card_set in valid_set_generator:
+            visualize_set(card_set, oim)
+    except Exception, e:
+        print e
+    finally:
+        cv2.destroyAllWindows()
 
 
 parser = argparse.ArgumentParser(description='Finds Sets in image of Set cards')
