@@ -1,7 +1,10 @@
 import argparse
+from multiprocessing import Process, Queue
 from itertools import combinations
-import numpy as np
+from math import factorial
+
 import cv2
+import numpy as np
 
 import transformation
 import learning
@@ -20,8 +23,7 @@ def find_cards_in_image(im):
     return filter(lambda t: edges.size / 50 < cv2.contourArea(t) < edges.size / 10, trapezoids)
 
 
-def get_card_features(target_dimensions, im, shape_points):
-    card_borders = find_cards_in_image(im)
+def get_card_features(target_dimensions, im, card_borders, shape_points):
     transformer = transformation.Transformer(is_target=True, image_dimensions=target_dimensions)
     cards = {cid: Card(cid, border, transformer.transform(im, border.copy()), shape_points)
              for cid, border in enumerate(card_borders)}
@@ -72,27 +74,55 @@ def overlay_ar_board(cards, im):
     return im
 
 
-def get_sets_from_image(oim, set_size=3, view_ar=False):
-    #import time
-    #t = time.time()
-    all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim, shape_points=180)  # 1.34 s
-    #print time.time() - t
+def distraction(oim, borders, set_size, time_to_waste=5):
+    n = len(borders)
+    k = set_size
+    nCr = factorial(n) / (factorial(k) * factorial(n-k))
+    show_time = 6000 / nCr
+    cv2.namedWindow('Searching for Sets')
+    for border_set in combinations(range(len(borders)), set_size):
+        im = oim.copy()
+        cv2.drawContours(im, [borders[i] for i in border_set], -1, (0, 0, 255), 3)
+        cv2.imshow('Searching for Sets', im)
+        cv2.waitKey(show_time)
+
+
+def get_card_data(oim, borders, results):
+    all_cards = get_card_features(target_dimensions=(int(270), int(420), 3), im=oim, card_borders=borders,
+                                  shape_points=180)  # 1.34 s
     learning.classify_attributes(all_cards, ['shape', 'color', 'count', 'infill'], max_k=5)  # 1.05 s, but f(max_k)
+    results.put(all_cards)
+
+
+def get_sets_from_image(oim, set_size=3, view_ar=False, distract=True):
+    import time
+    t = time.time()
+    borders = find_cards_in_image(oim)
+    results = Queue()
+    processes = []
+    process_c = Process(target=get_card_data, args=(oim.copy(), borders, results))
+    processes.append(process_c)
+    if distract:
+        process_d = Process(target=distraction, args=(oim.copy(), borders, set_size))
+        processes.append(process_d)
+    map(lambda process: process.start(), processes)
+    map(lambda process: process.join(5), processes)
+    all_cards = results.get()
     if view_ar:
         oim = overlay_ar_board(all_cards.values(), oim)  # 1.03 s
+    print time.time() - t
     valid_sets = generate_valid_sets(all_cards, set_size)  # 0.00 s
     return oim, valid_sets
 
 
 def main(filename=None, set_size=3, view_ar=False):
-    if filename is None:
-        raise Exception('get_image_from_camera() not yet implemented')
-    else:
-        oim = cv2.imread(filename, flags=1)
-    oim, valid_set_generator = get_sets_from_image(oim, set_size, view_ar)
-    map(lambda card_set: visualize_set(card_set, oim), valid_set_generator)
     try:
-        pass
+        if filename is None:
+            raise Exception('get_image_from_camera() not yet implemented')
+        else:
+            oim = cv2.imread(filename, flags=1)
+        oim, valid_set_generator = get_sets_from_image(oim, set_size, view_ar, distract=True)
+        map(lambda card_set: visualize_set(card_set, oim), valid_set_generator)
     except Exception, e:
         print e
     finally:
