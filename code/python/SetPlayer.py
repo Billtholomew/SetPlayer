@@ -1,12 +1,12 @@
 import argparse
-from multiprocessing import Process, Pool
 from itertools import combinations
+from multiprocessing import Process, Pool
 
 import cv2
 import numpy as np
 
-import transformation
 import learning
+import transformation
 from Card import Card
 from image_processing import auto_canny
 
