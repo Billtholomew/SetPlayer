@@ -19,7 +19,7 @@ class Transformer:
         else:
             self.vertices = vertices.reshape((-1, 2))
 
-        r0, c0 = np.round(np.mean(self.vertices, axis=0)).astype(np.int32)
+        r0, c0 = np.mean(self.vertices, axis=0).astype(np.int32)
         self.vertices = np.array(sorted(self.vertices, key=lambda (r, c): np.arctan2(r0 - r, c0 - c)))
         # get barycentric coordinates and corresponding points in target (new) image
         nys = np.arange(self.image_dimensions[0])

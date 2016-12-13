@@ -5,9 +5,11 @@ from image_processing import im_mask, contour_polar2xy, contour_xy2polar
 
 
 class Card:
-    def __init__(self, cid, loc, card_image, shape_points):
+    def __init__(self, card_data):
+        cid, loc, im, transformer, shape_points = card_data
         self.cid = cid
         self.loc = loc  # 4 vertices of quadrilateral in image
+        card_image = transformer.transform(im, loc)
         self.contours = self.find_contours(card_image)
         self.attributes = {}
         self.shape_points = shape_points
@@ -15,8 +17,8 @@ class Card:
         self.update_attribute(Count(self.contours))  # 0.000 s
         self.update_attribute(Shape(self.contours, shape_points))  # 0.02 s
 
-        shape_mask = np.zeros((card_image.shape[0], card_image.shape[1]))
-        cv2.drawContours(shape_mask, self.contours, -1, 1, -1)
+        shape_mask = np.zeros(card_image.shape)
+        cv2.drawContours(shape_mask, self.contours, -1, (1, 1, 1), -1)
         card_image_hsv = cv2.cvtColor(card_image, cv2.COLOR_BGR2HSV)
 
         self.update_attribute(Color(card_image_hsv, shape_mask))  # 0.002 s
@@ -131,15 +133,11 @@ class Color(AbstractAttribute):
         self.parse_image(card_image_hsv, shape_mask)
 
     def parse_image(self, card_image_hsv, shape_mask):
-        shape_hsv = card_image_hsv * np.dstack((shape_mask, shape_mask, shape_mask))
+        shape_hsv = card_image_hsv * shape_mask
         shape_mask = shape_hsv[:, :, 1] > 64
         shape_hue = shape_hsv[shape_mask, 0].astype(np.int32) * 2  # rescale to be [0, 360)
         shape_hue_radians = shape_hue * (np.pi / 180)
-        xs = np.cos(shape_hue_radians)
-        x = np.mean(xs)
-        ys = np.sin(shape_hue_radians)
-        y = np.mean(ys)
-        self.data = [x, y]
+        self.data = np.mean([np.cos(shape_hue_radians), np.sin(shape_hue_radians)], axis=1)
 
 
 class Infill(AbstractAttribute):
@@ -148,7 +146,7 @@ class Infill(AbstractAttribute):
         self.parse_image(card_image, shape_mask)
 
     def parse_image(self, card_image_hsv, shape_mask):
-        shape_mask = cv2.erode(shape_mask[:, :,], np.ones((16, 16), np.uint8), iterations=1)
+        shape_mask = cv2.erode(shape_mask[:, :, 0], np.ones((16, 16), np.uint8), iterations=1)
 
         shape_hsv = card_image_hsv[shape_mask == 1]
         shape_saturation_mean = np.mean(shape_hsv[:, 1])

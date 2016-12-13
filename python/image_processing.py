@@ -55,7 +55,7 @@ def contour_xy2polar(contour, n_points=180):
     cy = int(m['m01'] / m['m00'])
     cx = int(m['m10'] / m['m00'])
     polar = map(lambda (x, y):
-                (np.arctan2(cy - y, cx - x), np.sqrt((cx - x) ** 2 + (cy - y) ** 2)),
+                (np.arctan2(cy - y, cx - x), np.hypot((cx - x), (cy - y))),
                 map(lambda pt: pt[0], contour))
     polar = sorted(polar, key=lambda (t, r): t)
     thetas, radii = zip(*polar)
